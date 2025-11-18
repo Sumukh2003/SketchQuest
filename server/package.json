@@ -1,0 +1,37 @@
+{
+  "name": "sketchquest-server",
+  "version": "1.0.0",
+  "description": "Backend for SketchQuest - real-time drawing game",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only server.ts",
+    "build": "tsc",
+    "migrate": "knex migrate:latest",
+    "seed": "knex seed:run",
+    "migrate:rollback": "knex migrate:rollback"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "knex": "^2.5.1",
+    "mysql2": "^3.15.3",
+    "socket.io": "^4.8.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/node": "^20.19.25",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "game",
+    "drawing",
+    "multiplayer",
+    "realtime"
+  ],
+  "author": "",
+  "license": ""
+}
