@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -13,6 +13,7 @@ import {
   Container,
   Alert,
   Fab,
+  Snackbar,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -20,6 +21,7 @@ import {
   PlayArrow as PlayIcon,
   EmojiEvents as TrophyIcon,
 } from "@mui/icons-material";
+import { io, Socket } from "socket.io-client";
 import { Room, CreateRoomForm } from "../types";
 
 interface LobbyProps {
@@ -27,6 +29,7 @@ interface LobbyProps {
 }
 
 const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [joinData, setJoinData] = useState({ roomCode: "", username: "" });
   const [createForm, setCreateForm] = useState<CreateRoomForm>({
     name: "",
@@ -36,47 +39,167 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
     isPublic: true,
     password: "",
   });
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io("http://localhost:5000");
+    setSocket(newSocket);
+
+    // Handle room created
+    newSocket.on("room_created", (data) => {
+      if (data.success) {
+        console.log("Room created:", data);
+        const mockRoom: Room = {
+          id: 1,
+          code: data.room.code,
+          name: data.room.name,
+          max_players: 8,
+          rounds: 3,
+          draw_time: 80,
+          is_public: true,
+          status: "waiting",
+        };
+        setNotification({
+          message: `Room ${data.room.code} created!`,
+          type: "success",
+        });
+        setTimeout(() => onRoomJoin(mockRoom), 1000);
+      }
+    });
+
+    // Handle room joined
+    newSocket.on("room_joined", (data) => {
+      if (data.success) {
+        console.log("Room joined:", data);
+        const mockRoom: Room = {
+          id: 1,
+          code: data.room.code,
+          name: data.room.name,
+          max_players: data.room.maxPlayers,
+          rounds: 3,
+          draw_time: 80,
+          is_public: true,
+          status: "waiting",
+        };
+        setNotification({
+          message: `Joined room ${data.room.code}!`,
+          type: "success",
+        });
+        setTimeout(() => onRoomJoin(mockRoom), 1000);
+      }
+    });
+
+    // Handle errors
+    newSocket.on("join_error", (data) => {
+      setNotification({ message: `Error: ${data.error}`, type: "error" });
+    });
+
+    newSocket.on("error", (data) => {
+      setNotification({ message: `Error: ${data.message}`, type: "error" });
+    });
+
+    // Test connection
+    newSocket.on("connect", () => {
+      console.log("Connected to server with ID:", newSocket.id);
+    });
+
+    return () => {
+      newSocket.close();
+    };
+  }, [onRoomJoin]);
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual room joining logic
-    console.log("Joining room:", joinData);
+    if (!socket) {
+      setNotification({ message: "Not connected to server", type: "error" });
+      return;
+    }
 
-    // Mock room for testing
-    const mockRoom: Room = {
-      id: 1,
-      code: joinData.roomCode || "TEST123",
-      name: "Test Room",
-      max_players: 8,
-      rounds: 3,
-      draw_time: 80,
-      is_public: true,
-      status: "waiting",
-    };
-    onRoomJoin(mockRoom);
+    if (!joinData.roomCode.trim() || !joinData.username.trim()) {
+      setNotification({
+        message: "Please enter room code and username",
+        type: "error",
+      });
+      return;
+    }
+
+    console.log("Joining room:", joinData);
+    socket.emit("join_room", {
+      roomCode: joinData.roomCode.toUpperCase(),
+      username: joinData.username,
+    });
   };
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual room creation logic
-    console.log("Creating room:", createForm);
+    if (!socket) {
+      setNotification({ message: "Not connected to server", type: "error" });
+      return;
+    }
 
-    // Mock room for testing
-    const mockRoom: Room = {
-      id: 1,
-      code: "NEW123",
-      name: createForm.name,
-      max_players: createForm.maxPlayers,
+    if (!createForm.name.trim() || !joinData.username.trim()) {
+      setNotification({
+        message: "Please enter room name and username",
+        type: "error",
+      });
+      return;
+    }
+
+    console.log("Creating room:", {
+      ...createForm,
+      username: joinData.username,
+    });
+    socket.emit("create_room", {
+      roomName: createForm.name,
+      username: joinData.username,
+      maxPlayers: createForm.maxPlayers,
       rounds: createForm.rounds,
-      draw_time: createForm.drawTime,
-      is_public: createForm.isPublic,
-      status: "waiting",
-    };
-    onRoomJoin(mockRoom);
+      drawTime: createForm.drawTime,
+    });
+  };
+
+  const handleQuickStart = () => {
+    const randomUsername = `Player${Math.floor(Math.random() * 1000)}`;
+    const roomName = `Quick Room ${Math.floor(Math.random() * 100)}`;
+
+    setJoinData((prev) => ({ ...prev, username: randomUsername }));
+    setCreateForm((prev) => ({ ...prev, name: roomName }));
+
+    // Auto-create room after a delay
+    setTimeout(() => {
+      if (socket) {
+        socket.emit("create_room", {
+          roomName: roomName,
+          username: randomUsername,
+          maxPlayers: 4,
+          rounds: 2,
+          drawTime: 60,
+        });
+      }
+    }, 500);
   };
 
   return (
     <Container maxWidth="lg">
+      <Snackbar
+        open={!!notification}
+        autoHideDuration={4000}
+        onClose={() => setNotification(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={notification?.type}
+          onClose={() => setNotification(null)}
+          sx={{ width: "100%" }}
+        >
+          {notification?.message}
+        </Alert>
+      </Snackbar>
+
       <Grid container spacing={4}>
         {/* Header Section */}
         <Grid item xs={12}>
@@ -177,21 +300,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
               <Box component="form" onSubmit={handleJoinRoom}>
                 <TextField
                   fullWidth
-                  label="Room Code"
-                  value={joinData.roomCode}
-                  onChange={(e) =>
-                    setJoinData((prev) => ({
-                      ...prev,
-                      roomCode: e.target.value,
-                    }))
-                  }
-                  margin="normal"
-                  placeholder="e.g., ABC123"
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Your Username"
+                  label="Username"
                   value={joinData.username}
                   onChange={(e) =>
                     setJoinData((prev) => ({
@@ -201,17 +310,34 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
                   }
                   margin="normal"
                   placeholder="Enter your display name"
+                  sx={{ mb: 2 }}
+                  required
+                />
+                <TextField
+                  fullWidth
+                  label="Room Code"
+                  value={joinData.roomCode}
+                  onChange={(e) =>
+                    setJoinData((prev) => ({
+                      ...prev,
+                      roomCode: e.target.value.toUpperCase(),
+                    }))
+                  }
+                  margin="normal"
+                  placeholder="e.g., ABC123"
                   sx={{ mb: 3 }}
+                  required
+                  inputProps={{ style: { textTransform: "uppercase" } }}
                 />
                 <Button
                   type="submit"
                   variant="contained"
                   size="large"
                   fullWidth
-                  disabled={!joinData.roomCode || !joinData.username}
+                  disabled={!socket || !joinData.roomCode || !joinData.username}
                   startIcon={<GroupsIcon />}
                 >
-                  Join Room
+                  {socket ? "Join Room" : "Connecting..."}
                 </Button>
               </Box>
             </CardContent>
@@ -254,6 +380,21 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
               <Box component="form" onSubmit={handleCreateRoom}>
                 <TextField
                   fullWidth
+                  label="Username"
+                  value={joinData.username}
+                  onChange={(e) =>
+                    setJoinData((prev) => ({
+                      ...prev,
+                      username: e.target.value,
+                    }))
+                  }
+                  margin="normal"
+                  placeholder="Enter your display name"
+                  sx={{ mb: 2 }}
+                  required
+                />
+                <TextField
+                  fullWidth
                   label="Room Name"
                   value={createForm.name}
                   onChange={(e) =>
@@ -262,6 +403,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
                   margin="normal"
                   placeholder="e.g., Art Masters Tournament"
                   sx={{ mb: 2 }}
+                  required
                 />
 
                 <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -318,7 +460,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
                   variant="contained"
                   size="large"
                   fullWidth
-                  disabled={!createForm.name}
+                  disabled={!socket || !createForm.name || !joinData.username}
                   startIcon={<AddIcon />}
                   sx={{
                     background: "linear-gradient(45deg, #6366f1, #818cf8)",
@@ -327,26 +469,34 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
                     },
                   }}
                 >
-                  Create Room
+                  {socket ? "Create Room" : "Connecting..."}
                 </Button>
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Quick Stats/Info */}
+        {/* Connection Status */}
         <Grid item xs={12}>
           <Alert
-            severity="info"
+            severity={socket?.connected ? "success" : "warning"}
             sx={{
               borderRadius: 3,
-              background: "rgba(59, 130, 246, 0.1)",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
+              background: socket?.connected
+                ? "rgba(16, 185, 129, 0.1)"
+                : "rgba(245, 158, 11, 0.1)",
+              border: socket?.connected
+                ? "1px solid rgba(16, 185, 129, 0.2)"
+                : "1px solid rgba(245, 158, 11, 0.2)",
             }}
           >
             <Typography variant="body2">
-              <strong>Tip:</strong> Share your room code with friends to play
-              together! Rooms automatically close when empty.
+              {socket?.connected
+                ? `✅ Connected to server (ID: ${socket.id?.substring(
+                    0,
+                    8
+                  )}...)`
+                : "⚠️ Connecting to server..."}
             </Typography>
           </Alert>
         </Grid>
@@ -362,25 +512,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
           right: 24,
           background: "linear-gradient(45deg, #ec4899, #f472b6)",
         }}
-        onClick={() => {
-          setJoinData({
-            roomCode: "DEMO123",
-            username: "Player" + Math.floor(Math.random() * 1000),
-          });
-          setTimeout(() => {
-            const mockRoom: Room = {
-              id: 1,
-              code: "DEMO123",
-              name: "Demo Room",
-              max_players: 8,
-              rounds: 3,
-              draw_time: 80,
-              is_public: true,
-              status: "waiting",
-            };
-            onRoomJoin(mockRoom);
-          }, 500);
-        }}
+        onClick={handleQuickStart}
       >
         <PlayIcon />
       </Fab>
