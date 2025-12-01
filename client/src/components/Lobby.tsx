@@ -54,7 +54,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
       if (data.success) {
         console.log("Room created:", data);
         const mockRoom: Room = {
-          id: 1,
+          id: Date.now().toString(), // Changed to string
           code: data.room.code,
           name: data.room.name,
           max_players: 8,
@@ -63,6 +63,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
           is_public: true,
           status: "waiting",
         };
+
         setNotification({
           message: `Room ${data.room.code} created!`,
           type: "success",
@@ -76,7 +77,7 @@ const Lobby: React.FC<LobbyProps> = ({ onRoomJoin }) => {
       if (data.success) {
         console.log("Room joined:", data);
         const mockRoom: Room = {
-          id: 1,
+          id: Date.now().toString(), // Changed to string
           code: data.room.code,
           name: data.room.name,
           max_players: data.room.maxPlayers,
