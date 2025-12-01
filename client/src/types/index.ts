@@ -1,12 +1,12 @@
 export interface Player {
-  id: number;
+  id: string; // Changed from number to string
   username: string;
   score: number;
   is_host: boolean;
 }
 
 export interface Room {
-  id: number;
+  id: string; // Changed from number to string
   code: string;
   name: string;
   max_players: number;
@@ -23,15 +23,6 @@ export interface Message {
   timestamp: Date;
 }
 
-export interface DrawData {
-  x: number;
-  y: number;
-  prevX: number;
-  prevY: number;
-  color: string;
-  lineWidth: number;
-}
-
 export interface GameState {
   room: Room | null;
   players: Player[];
@@ -42,6 +33,15 @@ export interface GameState {
   gameStatus: "waiting" | "playing" | "finished";
   isDrawing: boolean;
   currentWord: string | null;
+}
+
+export interface DrawData {
+  x: number;
+  y: number;
+  prevX: number;
+  prevY: number;
+  color: string;
+  lineWidth: number;
 }
 
 export interface CreateRoomForm {

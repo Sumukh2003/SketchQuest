@@ -21,6 +21,7 @@ interface Player {
   isHost: boolean;
 }
 
+// Update Room interface
 interface Room {
   id: string;
   code: string;
@@ -29,11 +30,13 @@ interface Room {
   rounds: number;
   drawTime: number;
   players: Player[];
-  status: "waiting" | "playing";
+  status: "waiting" | "playing" | "finished";
   currentDrawer: string | null;
   currentWord: string | null;
   gameState: string;
   guessedPlayers?: string[];
+  currentRound: number;
+  timer?: NodeJS.Timeout;
   createdAt: Date;
 }
 
@@ -71,6 +74,91 @@ function getRandomWord(): string {
   return words[Math.floor(Math.random() * words.length)];
 }
 
+// Add timer function
+function startRoundTimer(room: Room) {
+  if (room.timer) {
+    clearInterval(room.timer);
+  }
+
+  let timeLeft = room.drawTime;
+
+  room.timer = setInterval(() => {
+    timeLeft--;
+
+    // Emit timer update to all players
+    io.to(room.code).emit("timer_update", { timeLeft });
+
+    if (timeLeft <= 0) {
+      clearInterval(room.timer!);
+      endRound(room);
+    }
+  }, 1000);
+}
+
+// Update startNewRound function
+function startNewRound(room: Room) {
+  room.gameState = "drawing";
+  room.guessedPlayers = [];
+  room.currentRound = (room.currentRound || 0) + 1;
+
+  // Select random drawer
+  const drawerIndex = Math.floor(Math.random() * room.players.length);
+  room.currentDrawer = room.players[drawerIndex].id;
+
+  // Select random word
+  room.currentWord = getRandomWord();
+
+  // Notify players
+  io.to(room.code).emit("round_started", {
+    drawer: room.players[drawerIndex].username,
+    wordLength: room.currentWord.length,
+    round: room.currentRound,
+  });
+
+  // Notify drawer privately
+  io.to(room.currentDrawer).emit("your_turn_to_draw", {
+    word: room.currentWord,
+  });
+
+  // Start timer
+  startRoundTimer(room);
+}
+
+function endRound(room: Room) {
+  room.gameState = "round_end";
+
+  // Clear timer
+  if (room.timer) {
+    clearInterval(room.timer);
+  }
+
+  io.to(room.code).emit("round_ended", {
+    word: room.currentWord,
+    scores: room.players.map((p: Player) => ({
+      username: p.username,
+      score: p.score,
+    })),
+  });
+
+  // Check if game should continue
+  if (room.currentRound >= room.rounds) {
+    room.status = "finished";
+    io.to(room.code).emit("game_ended", {
+      finalScores: room.players.map((p: Player) => ({
+        username: p.username,
+        score: p.score,
+      })),
+    });
+  } else {
+    // Start next round after delay
+    setTimeout(() => {
+      if (room.status === "playing") {
+        startNewRound(room);
+      }
+    }, 5000);
+  }
+}
+
 // API Routes
 app.use(cors());
 app.use(express.json());
@@ -78,7 +166,7 @@ app.use(express.json());
 app.get("/api/health", (req: any, res: any) => {
   res.json({
     status: "OK",
-    message: "🎨 SketchQuest Server - Day 2 Ready!",
+    message: "🎨 SketchQuest Server - Day 3 Ready!",
     timestamp: new Date().toISOString(),
     activeRooms: rooms.size,
     activeUsers: users.size,
@@ -109,6 +197,7 @@ app.post("/api/rooms/create", (req: any, res: any) => {
     currentDrawer: null,
     currentWord: null,
     gameState: "lobby",
+    currentRound: 0,
     createdAt: new Date(),
   };
 
@@ -176,6 +265,7 @@ io.on("connection", (socket: any) => {
       currentDrawer: null,
       currentWord: null,
       gameState: "lobby",
+      currentRound: 0,
       createdAt: new Date(),
     };
 
@@ -251,6 +341,39 @@ io.on("connection", (socket: any) => {
     console.log(`👤 ${username} joined room: ${room.code}`);
   });
 
+  // Add leave_room event handler in socket connection
+  socket.on("leave_room", (data: { roomCode: string }) => {
+    const { roomCode } = data;
+    const user = users.get(socket.id);
+
+    if (user) {
+      const room = rooms.get(roomCode);
+
+      if (room) {
+        // Remove player from room
+        room.players = room.players.filter((p: Player) => p.id !== socket.id);
+
+        // Notify other players
+        socket.to(room.code).emit("player_left", {
+          username: user.username,
+          players: room.players,
+        });
+
+        // If room is empty, delete it
+        if (room.players.length === 0) {
+          if (room.timer) {
+            clearInterval(room.timer);
+          }
+          rooms.delete(room.code);
+          console.log(`🗑️ Room deleted: ${room.code}`);
+        }
+      }
+
+      users.delete(socket.id);
+      socket.leave(roomCode);
+    }
+  });
+
   socket.on("start_game", (data: any) => {
     const { roomCode } = data;
     const room = rooms.get(roomCode);
@@ -308,10 +431,13 @@ io.on("connection", (socket: any) => {
       ) {
         chatMessage.isCorrect = true;
 
-        // Award points
+        // Award points based on time remaining
+        const timeBonus = Math.max(50, Math.floor(room.drawTime / 10) * 10);
+        const points = timeBonus + 50; // Base points + time bonus
+
         const player = room.players.find((p: Player) => p.id === socket.id);
         if (player) {
-          player.score += 100;
+          player.score += points;
         }
 
         if (!room.guessedPlayers) room.guessedPlayers = [];
@@ -320,7 +446,7 @@ io.on("connection", (socket: any) => {
         io.to(roomCode).emit("correct_guess", {
           username: user.username,
           word: room.currentWord,
-          points: 100,
+          points: points,
         });
 
         // Check if all players guessed
@@ -378,6 +504,9 @@ io.on("connection", (socket: any) => {
 
         // If room is empty, delete it
         if (room.players.length === 0) {
+          if (room.timer) {
+            clearInterval(room.timer);
+          }
           rooms.delete(room.code);
           console.log(`🗑️ Room deleted: ${room.code}`);
         }
@@ -390,57 +519,15 @@ io.on("connection", (socket: any) => {
   });
 });
 
-function startNewRound(room: Room) {
-  room.gameState = "drawing";
-  room.guessedPlayers = [];
-
-  // Select random drawer
-  const drawerIndex = Math.floor(Math.random() * room.players.length);
-  room.currentDrawer = room.players[drawerIndex].id;
-
-  // Select random word
-  room.currentWord = getRandomWord();
-
-  // Notify players
-  io.to(room.code).emit("round_started", {
-    drawer: room.players[drawerIndex].username,
-    wordLength: room.currentWord.length,
-    round: 1,
-  });
-
-  // Notify drawer privately
-  io.to(room.currentDrawer).emit("your_turn_to_draw", {
-    word: room.currentWord,
-  });
-}
-
-function endRound(room: Room) {
-  room.gameState = "round_end";
-
-  io.to(room.code).emit("round_ended", {
-    word: room.currentWord,
-    scores: room.players.map((p: Player) => ({
-      username: p.username,
-      score: p.score,
-    })),
-  });
-
-  // Start next round after delay
-  setTimeout(() => {
-    if (room.status === "playing") {
-      startNewRound(room);
-    }
-  }, 5000);
-}
-
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log("🚀 SketchQuest Server - Day 2 Features Active!");
+  console.log("🚀 SketchQuest Server - Day 3 Features Active!");
   console.log(`📍 Port: ${PORT}`);
   console.log(`🌐 Environment: development`);
   console.log(`🎮 Game Logic: Enabled`);
-  console.log(`🔗 Socket.IO: Real-time features ready`);
-  console.log(`📊 Storage: In-memory (MySQL ready for Day 3)`);
+  console.log(`⏱️ Timer System: Ready`);
+  console.log(`🎨 Drawing Sync: Active`);
+  console.log(`📊 Storage: In-memory`);
   console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
 });
