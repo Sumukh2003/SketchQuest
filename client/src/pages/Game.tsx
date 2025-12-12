@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { socket } from "../socket";
 import { Player } from "../types";
-import { Box, Button, Stack, Paper, Typography } from "@mui/material";
+import { Box, Button, Stack, Paper, Typography, Dialog } from "@mui/material";
 import CanvasDraw from "../components/CanvasDraw";
 import Chat from "../components/Chat";
 import ScoreList from "../components/ScoreList";
@@ -12,11 +12,18 @@ export default function Game({ room, name }: { room: string; name: string }) {
   const [isHost, setIsHost] = useState(false);
   const [chooseWords, setChooseWords] = useState<string[] | null>(null);
 
+  const [showRoundPopup, setShowRoundPopup] = useState(false);
+  const [popupText, setPopupText] = useState("");
+
   const [roundInfo, setRoundInfo] = useState<{
     round?: number;
     roundEndsAt?: number;
   } | null>(null);
   const [word, setWord] = useState<string | null>(null);
+  const [popup, setPopup] = useState<{
+    open: boolean;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     socket.emit(
@@ -52,8 +59,47 @@ export default function Game({ room, name }: { room: string; name: string }) {
       setWord(data.word);
     });
 
-    socket.on("correct_guess", (data: any) => {
-      alert(`${data.name} guessed the word "${data.word}"`);
+    // socket.on("correct_guess", (data: any) => {
+    //   alert(`${data.name} guessed the word "${data.word}"`);
+    // });
+
+    socket.on("round_end", ({ round, nextRound }) => {
+      let countdown = 3;
+      setShowRoundPopup(true);
+      setPopupText(
+        `Round ${round} ended. Next round starts in ${countdown}...`
+      );
+
+      const interval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          setPopupText(
+            `Round ${round} ended. Next round starts in ${countdown}...`
+          );
+        } else {
+          clearInterval(interval);
+          setShowRoundPopup(false);
+          socket.emit("start_next_round");
+        }
+      }, 1000);
+    });
+
+    socket.on("round_start", ({ round }) => {
+      setShowRoundPopup(false);
+    });
+
+    socket.on("next_round_starting", (data: any) => {
+      setPopup({
+        open: true,
+        message: `Starting Round ${data.round} in 3 seconds...`,
+      });
+    });
+
+    socket.on("game_over", (data: any) => {
+      setPopup({
+        open: true,
+        message: `Game Over! Winner: ${data.winner}`,
+      });
     });
 
     return () => {
@@ -126,6 +172,11 @@ export default function Game({ room, name }: { room: string; name: string }) {
           <Chat room={room} />
         </Box>
       </Stack>
+      <Dialog open={showRoundPopup}>
+        <Paper style={{ padding: 30, textAlign: "center" }}>
+          <Typography variant="h5">{popupText}</Typography>
+        </Paper>
+      </Dialog>
     </Stack>
   );
 }
