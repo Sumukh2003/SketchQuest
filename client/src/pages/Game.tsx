@@ -24,6 +24,10 @@ export default function Game({ room, name }: { room: string; name: string }) {
     open: boolean;
     message: string;
   } | null>(null);
+  const [finalResult, setFinalResult] = useState<{
+    players: Player[];
+    winner: Player;
+  } | null>(null);
 
   useEffect(() => {
     socket.emit(
@@ -95,11 +99,9 @@ export default function Game({ room, name }: { room: string; name: string }) {
       });
     });
 
-    socket.on("game_over", (data: any) => {
-      setPopup({
-        open: true,
-        message: `Game Over! Winner: ${data.winner}`,
-      });
+    socket.on("game_over", ({ players, winner }) => {
+      setFinalResult({ players, winner });
+      setShowRoundPopup(false);
     });
 
     return () => {
@@ -161,8 +163,8 @@ export default function Game({ room, name }: { room: string; name: string }) {
         <Box width={320}>
           <Paper style={{ padding: 8, marginBottom: 8 }}>
             <Typography variant="subtitle1">Players</Typography>
-            <ScoreList players={players} />
-            <Typography variant="caption">
+            <ScoreList players={players} drawChip={true} />
+            <Typography variant="body1">
               You are: {name} {isDrawer ? "(drawer)" : ""}
             </Typography>
             {isDrawer && word && (
@@ -175,6 +177,28 @@ export default function Game({ room, name }: { room: string; name: string }) {
       <Dialog open={showRoundPopup}>
         <Paper style={{ padding: 30, textAlign: "center" }}>
           <Typography variant="h5">{popupText}</Typography>
+        </Paper>
+      </Dialog>
+      <Dialog open={!!finalResult}>
+        <Paper style={{ padding: 24, minWidth: 300 }}>
+          <Typography variant="h5" gutterBottom>
+            Game Over 🏁
+          </Typography>
+
+          <Typography variant="h6">
+            Winner: {finalResult?.winner.name} 🏆
+          </Typography>
+
+          <ScoreList players={finalResult?.players || []} drawChip={false} />
+
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => window.location.reload()}
+            style={{ marginTop: 16 }}
+          >
+            Exit
+          </Button>
         </Paper>
       </Dialog>
     </Stack>

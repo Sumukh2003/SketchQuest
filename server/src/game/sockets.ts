@@ -49,7 +49,13 @@ function endRound(io: Server, room: string) {
 
   // If last round → end game
   if (game.round >= game.maxRounds) {
-    io.to(room).emit("game_over", { players: game.players });
+    const sorted = [...game.players].sort((a, b) => b.score - a.score);
+
+    io.to(room).emit("game_over", {
+      players: sorted,
+      winner: sorted[0],
+    });
+
     return;
   }
 
@@ -78,14 +84,24 @@ export function registerSocketHandlers(io: Server) {
     console.log("conn:", socket.id);
 
     // CREATE GAME
-    socket.on("create_game", ({ name, maxPlayers, numRounds }, cb) => {
+    socket.on("create_game", ({ name, maxPlayers, numRounds, avatar }, cb) => {
       const room = generateRoomId();
-      gm.createGame(room, socket.id, name, numRounds || 3, maxPlayers || 5);
+      const game = gm.createGame(
+        room,
+        socket.id,
+        name,
+        numRounds || 3,
+        maxPlayers || 5
+      );
+
+      // Add host as first player with avatar
+      gm.addPlayer(room, { id: socket.id, name, score: 0, avatar });
+
       cb({ room });
     });
 
     // JOIN GAME
-    socket.on("join_game", async ({ room, name }, cb) => {
+    socket.on("join_game", async ({ room, name, avatar }, cb) => {
       let game = gm.getGame(room);
 
       // If room doesn't exist, create it (creator becomes host)
@@ -101,7 +117,7 @@ export function registerSocketHandlers(io: Server) {
       // Already in room?
       const exists = game.players.some((p) => p.id === socket.id);
       if (!exists) {
-        gm.addPlayer(room, { id: socket.id, name, score: 0 });
+        gm.addPlayer(room, { id: socket.id, name, score: 0, avatar });
       }
 
       socket.join(room);
@@ -132,6 +148,9 @@ export function registerSocketHandlers(io: Server) {
       while (wordOptions.length < 3 && rows.length > 0) {
         const w = rows[Math.floor(Math.random() * rows.length)].word;
         if (!wordOptions.includes(w)) wordOptions.push(w);
+      }
+      if (game.round >= game.maxRounds) {
+        return cb({ error: "Game already finished" });
       }
 
       // send choose_word to drawer and broadcast players
