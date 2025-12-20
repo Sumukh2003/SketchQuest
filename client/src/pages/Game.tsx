@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { socket } from "../socket";
 import { Player } from "../types";
-import { Box, Button, Stack, Paper, Typography, Dialog } from "@mui/material";
+import {
+  Box,
+  Button,
+  Stack,
+  Paper,
+  Typography,
+  Dialog,
+  Grid,
+} from "@mui/material";
 import CanvasDraw from "../components/CanvasDraw";
 import Chat from "../components/Chat";
 import ScoreList from "../components/ScoreList";
@@ -117,90 +125,128 @@ export default function Game({ room, name }: { room: string; name: string }) {
   };
 
   return (
-    <Stack spacing={2}>
-      <Paper style={{ padding: 12 }}>
-        <Stack
-          direction="row"
-          spacing={2}
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <Typography variant="h6">Room: {room}</Typography>
-          <div>
-            {isHost && !roundInfo?.round && (
-              <Button variant="contained" onClick={startRound}>
-                Start Round
-              </Button>
-            )}
-          </div>
-        </Stack>
+    <Box
+      sx={{
+        padding: 2,
+        width: "100%",
+        minHeight: "100vh",
+        background: "#f5f5f5",
+      }}
+    >
+      {/* Header */}
+      <Paper
+        sx={{
+          padding: 2,
+          marginBottom: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+        elevation={3}
+      >
+        <Typography variant="h6">Room: {room}</Typography>
+        {isHost && !roundInfo?.round && (
+          <Button variant="contained" color="primary" onClick={startRound}>
+            Start Round
+          </Button>
+        )}
       </Paper>
 
-      {chooseWords && (
-        <div>
-          <h3>Choose a word</h3>
-          {chooseWords.map((w) => (
-            <button
-              key={w}
-              onClick={() => {
-                socket.emit("word_chosen", { room, word: w });
-                setChooseWords(null);
-              }}
-            >
-              {w}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Word Selection for Drawer */}
+      <Dialog open={!!chooseWords}>
+        <Paper sx={{ padding: 4 }}>
+          <Typography variant="h5" gutterBottom>
+            Select a word to draw
+          </Typography>
+          <Stack spacing={2} direction="row">
+            {chooseWords?.map((w) => (
+              <Button
+                key={w}
+                variant="contained"
+                color="secondary"
+                onClick={() => {
+                  socket.emit("word_chosen", { room, word: w });
+                  setChooseWords(null);
+                }}
+              >
+                {w}
+              </Button>
+            ))}
+          </Stack>
+        </Paper>
+      </Dialog>
 
-      <Stack direction="row" spacing={2}>
-        <Box flex={1}>
-          <Paper style={{ padding: 8 }}>
+      {/* Main Game Area */}
+      <Grid container spacing={2}>
+        {/* Canvas */}
+        <Grid item xs={12} md={8}>
+          <Paper
+            sx={{
+              padding: 1,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+            }}
+            elevation={3}
+          >
             <CanvasDraw room={room} isDrawer={isDrawer} />
-          </Paper>
-        </Box>
-
-        <Box width={320}>
-          <Paper style={{ padding: 8, marginBottom: 8 }}>
-            <Typography variant="subtitle1">Players</Typography>
-            <ScoreList players={players} drawChip={true} />
-            <Typography variant="body1">
-              You are: {name} {isDrawer ? "(drawer)" : ""}
-            </Typography>
             {isDrawer && word && (
-              <Typography variant="h6">Word: {word}</Typography>
+              <Typography
+                sx={{ marginTop: 1, fontWeight: "bold" }}
+                variant="h6"
+              >
+                Word: {word}
+              </Typography>
             )}
           </Paper>
-          <Chat room={room} />
-        </Box>
-      </Stack>
+        </Grid>
+
+        {/* Sidebar */}
+        <Grid item xs={12} md={4}>
+          <Stack spacing={2}>
+            {/* Player List */}
+            <Paper sx={{ padding: 2 }} elevation={3}>
+              <Typography variant="subtitle1" gutterBottom>
+                Players
+              </Typography>
+              <ScoreList players={players} drawChip={true} />
+            </Paper>
+
+            {/* Chat */}
+            <Paper sx={{ padding: 2, height: 300 }} elevation={3}>
+              <Chat room={room} />
+            </Paper>
+          </Stack>
+        </Grid>
+      </Grid>
+
+      {/* Round Countdown Popup */}
       <Dialog open={showRoundPopup}>
-        <Paper style={{ padding: 30, textAlign: "center" }}>
+        <Paper sx={{ padding: 4, textAlign: "center" }}>
           <Typography variant="h5">{popupText}</Typography>
         </Paper>
       </Dialog>
-      <Dialog open={!!finalResult}>
-        <Paper style={{ padding: 24, minWidth: 300 }}>
-          <Typography variant="h5" gutterBottom>
-            Game Over 🏁
-          </Typography>
 
-          <Typography variant="h6">
+      {/* Game Over Modal */}
+      <Dialog open={!!finalResult}>
+        <Paper sx={{ padding: 4, minWidth: 300 }}>
+          <Typography variant="h4" gutterBottom align="center">
+            🏁 Game Over
+          </Typography>
+          <Typography variant="h6" gutterBottom align="center">
             Winner: {finalResult?.winner.name} 🏆
           </Typography>
-
           <ScoreList players={finalResult?.players || []} drawChip={false} />
-
           <Button
             fullWidth
             variant="contained"
+            sx={{ mt: 2 }}
             onClick={() => window.location.reload()}
-            style={{ marginTop: 16 }}
           >
             Exit
           </Button>
         </Paper>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }
