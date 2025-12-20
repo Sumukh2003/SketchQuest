@@ -1,6 +1,7 @@
 export interface Player {
   id: string;
   name: string;
+  avatar: string;
   score: number;
   isDrawer?: boolean;
   hasGuessed?: boolean;

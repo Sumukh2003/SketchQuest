@@ -1,25 +1,42 @@
 import React from "react";
 import { Player } from "../types";
-import { List, ListItem, ListItemText, Chip } from "@mui/material";
+import {
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Stack,
+  Typography,
+} from "@mui/material";
 
-export default function ScoreList({ players }: { players: Player[] }) {
+export default function ScoreList({
+  players,
+  drawChip,
+}: {
+  players: Player[];
+  drawChip: boolean;
+}) {
   return (
     <List dense>
       {players.map((p) => (
         <ListItem key={p.id}>
           <ListItemText
             primary={
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {p.name}
-                {p.isDrawer && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                {/* Avatar emoji */}
+                <Typography style={{ fontSize: 22 }}>{p.avatar}</Typography>
+                {/* Player name */}
+                <Typography>{p.name}</Typography>
+                {/* Drawing chip */}
+                {p.isDrawer && drawChip && (
                   <Chip
                     label="Drawing"
                     color="primary"
                     size="small"
-                    style={{ fontWeight: "bold" }}
+                    style={{ fontWeight: "bold", marginLeft: 4 }}
                   />
                 )}
-              </div>
+              </Stack>
             }
             secondary={`Score: ${p.score}`}
           />

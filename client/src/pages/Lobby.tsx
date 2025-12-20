@@ -12,34 +12,29 @@ import { socket } from "../socket";
 export default function Lobby({
   onJoin,
 }: {
-  onJoin: (room: string, name: string) => void;
+  onJoin: (room: string, name: string, avatar: string) => void;
 }) {
   const [name, setName] = useState("Player" + Math.floor(Math.random() * 1000));
   const [room, setRoom] = useState("");
-
+  const [avatar, setAvatar] = useState("🦊");
   // Options for creating room
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [numRounds, setNumRounds] = useState(3);
-
+  const avatars = ["🦊", "🐱", "🐶", "🐼", "🐸"];
   const create = () => {
     socket.emit(
       "create_game",
-      {
-        name: "Room",
-        maxPlayers,
-        numRounds,
-      },
-      (res: any) => {
-        if (res?.room) onJoin(res.room, name);
+      { name, maxPlayers, numRounds, avatar },
+      (res: { room: string }) => {
+        onJoin(res.room, name, avatar);
       }
     );
   };
 
   const join = () => {
     if (!room) return;
-    socket.emit("join_game", { room, name }, (res: any) => {
-      if (res?.ok) onJoin(room, name);
-      else alert("Failed to join");
+    socket.emit("join_game", { room, name, avatar }, (res: { ok: any }) => {
+      if (res?.ok) onJoin(room, name, avatar);
     });
   };
 
@@ -47,7 +42,19 @@ export default function Lobby({
     <Paper style={{ padding: 20 }}>
       <Stack spacing={2}>
         <Typography variant="h5">Skribbl Clone — Minimal</Typography>
-
+        <TextField
+          select
+          label="Avatar"
+          value={avatar}
+          onChange={(e) => setAvatar(e.target.value)}
+          style={{ width: 150 }}
+        >
+          {avatars.map((a) => (
+            <MenuItem key={a} value={a}>
+              {a}
+            </MenuItem>
+          ))}
+        </TextField>
         {/* Name */}
         <TextField
           label="Your Name"
