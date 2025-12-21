@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
-import { Container } from "@mui/material";
+import { Box } from "@mui/material";
 
 export default function App() {
   const [room, setRoom] = useState<string | null>(null);
   const [name, setName] = useState<string>("Player");
 
   return (
-    <Container maxWidth="md" style={{ paddingTop: 20 }}>
+    <Box>
       {!room ? (
         <Lobby
           onJoin={(r, n) => {
@@ -19,6 +19,6 @@ export default function App() {
       ) : (
         <Game room={room} name={name} />
       )}
-    </Container>
+    </Box>
   );
 }
