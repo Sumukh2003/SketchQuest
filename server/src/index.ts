@@ -18,7 +18,7 @@ const io = new Server(server, {
 registerSocketHandlers(io);
 
 // health
-app.get("/", (req, res) => res.send("SketchQuest-server OK"));
+app.get("/", (req, res) => res.send("skribbl-server OK"));
 
 const port = Number(process.env.PORT || 4000);
 server.listen(port, () => {
