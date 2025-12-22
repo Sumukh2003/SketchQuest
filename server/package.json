@@ -1,5 +1,5 @@
 {
-  "name": "skribbl-server",
+  "name": "SketchQuest-server",
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
