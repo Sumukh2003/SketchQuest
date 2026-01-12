@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  AppBar,
-  Toolbar,
   Button,
   TextField,
   Stack,
@@ -14,10 +12,8 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Divider,
   Container,
   IconButton,
-  Tooltip,
 } from "@mui/material";
 import {
   Person,
@@ -26,8 +22,9 @@ import {
   VpnKey,
   AddCircle,
   ArrowForward,
+  Edit,
+  Check,
   Brush,
-  Info,
 } from "@mui/icons-material";
 import { motion } from "framer-motion";
 import { socket } from "../socket";
@@ -41,11 +38,12 @@ export default function Lobby({
 }) {
   const [name, setName] = useState("Player" + Math.floor(Math.random() * 1000));
   const [room, setRoom] = useState("");
-  const [avatar, setAvatar] = useState("🦊");
+  const [avatar, setAvatar] = useState("🎨");
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [numRounds, setNumRounds] = useState(3);
+  const [isEditingName, setIsEditingName] = useState(false);
 
-  const avatars = ["🦊", "🐱", "🐶", "🐼", "🐸", "🦁", "🐵"];
+  const avatars = ["🎨", "✏️", "🖌️", "🎯", "🌟", "✨", "🔥", "💎"];
 
   const create = () => {
     socket.emit(
@@ -64,122 +62,252 @@ export default function Lobby({
     });
   };
 
+  const handleNameSubmit = () => {
+    if (name.trim()) {
+      setIsEditingName(false);
+    }
+  };
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #8e9eff 0%, #5b5be0 40%, #2b2f77 100%)",
-        color: "white",
+        background: "linear-gradient(135deg, #faf9f6 0%, #f0ede9 100%)",
+        color: "#333",
+        py: 4,
       }}
     >
-      {/* Top App Bar */}
-      {/* <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{
-          background: "rgba(0,0,0,0.25)",
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <Toolbar sx={{ maxWidth: 1400, width: "100%", mx: "auto" }}>
-          <Brush sx={{ mr: 1 }} />
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Sketch Quest
-          </Typography>
-          <Tooltip title="About the game">
-            <IconButton color="inherit">
-              <Info />
-            </IconButton>
-          </Tooltip>
-        </Toolbar>
-      </AppBar> */}
-
-      <Container maxWidth={false} sx={{ py: 1, maxWidth: 1400 }}>
-        {/* Hero */}
-        <Box textAlign="center" mb={2}>
+      <Container maxWidth="lg">
+        {/* Header */}
+        <Box sx={{ textAlign: "center", mb: 4 }}>
           <Typography
             variant="h2"
-            fontWeight={600}
-            sx={{ fontSize: { xs: "2.5rem", md: "3.5rem" } }}
+            sx={{
+              fontWeight: 800,
+              color: "#d35400",
+              letterSpacing: "-0.5px",
+            }}
           >
             Sketch Quest
           </Typography>
-          <Typography sx={{ opacity: 0.85, mt: 1 }}>
-            A real‑time multiplayer drawing & guessing game
+          <Typography
+            variant="h6"
+            sx={{
+              color: "#666",
+              fontWeight: 400,
+              maxWidth: 600,
+              mx: "auto",
+            }}
+          >
+            Draw, guess, and compete with friends in real-time
           </Typography>
         </Box>
 
         <Grid container spacing={4}>
-          {/* Player Profile */}
+          {/* Profile Section */}
           <Grid item xs={12} md={4}>
             <MotionCard
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
               sx={{
-                height: "100%",
                 borderRadius: 3,
-                background: "rgba(255,255,255,0.95)",
-                color: "text.primary",
+                background: "white",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+                border: "1px solid #e8e6e1",
+                height: "100%",
               }}
             >
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" fontWeight={700} mb={1}>
-                  Player Profile
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                  Choose how others see you
-                </Typography>
+              <CardContent sx={{ p: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    mb: 3,
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      bgcolor: "rgba(211, 84, 0, 0.1)",
+                      color: "#d35400",
+                      width: 48,
+                      height: 48,
+                    }}
+                  >
+                    <Person />
+                  </Avatar>
+                  <Box>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: "#333",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Your Profile
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "#888", mt: 0.5 }}>
+                      Customize your player identity
+                    </Typography>
+                  </Box>
+                </Box>
 
-                <Typography fontWeight={600} mb={2}>
-                  Avatar
-                </Typography>
-                <Grid container spacing={2} mb={3}>
-                  {avatars.map((a) => (
-                    <Grid item key={a}>
-                      <Avatar
-                        onClick={() => setAvatar(a)}
+                {/* Avatar Selection */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      color: "#444",
+                      mb: 2,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Choose Avatar
+                  </Typography>
+                  <Grid container spacing={1.5}>
+                    {avatars.map((a) => (
+                      <Grid item key={a} xs={4} sm={3}>
+                        <Avatar
+                          onClick={() => setAvatar(a)}
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            fontSize: 28,
+                            cursor: "pointer",
+                            bgcolor: avatar === a ? "#f9e4d4" : "#f8f8f8",
+                            color: avatar === a ? "#d35400" : "#666",
+                            border: `2px solid ${
+                              avatar === a ? "#d35400" : "#e0e0e0"
+                            }`,
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              transform: "scale(1.05)",
+                              borderColor: "#d35400",
+                              bgcolor: "#f9e4d4",
+                            },
+                          }}
+                        >
+                          {a}
+                        </Avatar>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+
+                {/* Name Input */}
+                <Box sx={{ mb: 4 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ color: "#444", fontWeight: 600 }}
+                    >
+                      Display Name
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        isEditingName
+                          ? handleNameSubmit()
+                          : setIsEditingName(true)
+                      }
+                      sx={{
+                        color: isEditingName ? "#27ae60" : "#999",
+                        "&:hover": {
+                          backgroundColor: "rgba(39, 174, 96, 0.1)",
+                        },
+                      }}
+                    >
+                      {isEditingName ? <Check /> : <Edit />}
+                    </IconButton>
+                  </Box>
+                  {isEditingName ? (
+                    <TextField
+                      fullWidth
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleNameSubmit()
+                      }
+                      autoFocus
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "#fafafa",
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#27ae60",
+                          },
+                        },
+                      }}
+                    />
+                  ) : (
+                    <Paper
+                      sx={{
+                        p: 2,
+                        bgcolor: "#fafafa",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: 2,
+                        cursor: "pointer",
+                        "&:hover": {
+                          borderColor: "#27ae60",
+                        },
+                      }}
+                      onClick={() => setIsEditingName(true)}
+                    >
+                      <Typography sx={{ color: "#333" }}>{name}</Typography>
+                    </Paper>
+                  )}
+                </Box>
+
+                {/* Preview */}
+                <Paper
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    background:
+                      "linear-gradient(135deg, #f9e4d4 0%, #f6d5c2 100%)",
+                    border: "1px solid #f0c8a8",
+                  }}
+                >
+                  <Stack direction="row" spacing={3} alignItems="center">
+                    <Avatar
+                      sx={{
+                        width: 60,
+                        height: 60,
+                        fontSize: 30,
+                        bgcolor: "white",
+                        color: "#d35400",
+                        border: "2px solid #d35400",
+                      }}
+                    >
+                      {avatar}
+                    </Avatar>
+                    <Box>
+                      <Typography
+                        variant="h6"
+                        sx={{ color: "#333", fontWeight: 600 }}
+                      >
+                        {name}
+                      </Typography>
+                      <Typography
+                        variant="caption"
                         sx={{
-                          width: 56,
-                          height: 56,
-                          fontSize: 26,
-                          cursor: "pointer",
-                          border:
-                            avatar === a
-                              ? "3px solid #5b5be0"
-                              : "2px solid #ddd",
-                          transition: "0.2s",
-                          bgcolor: avatar === a ? "#eef" : "transparent",
+                          color: "#666",
+                          display: "block",
+                          mt: 0.5,
+                          bgcolor: "rgba(255,255,255,0.6)",
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
                         }}
                       >
-                        {a}
-                      </Avatar>
-                    </Grid>
-                  ))}
-                </Grid>
-
-                <TextField
-                  fullWidth
-                  label="Player Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Person />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-
-                <Paper variant="outlined" sx={{ mt: 3, p: 2, borderRadius: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar sx={{ bgcolor: "#5b5be0" }}>{avatar}</Avatar>
-                    <Box>
-                      <Typography fontWeight={600}>{name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Ready to play
+                        Ready to draw! ✨
                       </Typography>
                     </Box>
                   </Stack>
@@ -194,75 +322,139 @@ export default function Lobby({
               {/* Create Game */}
               <Grid item xs={12} md={6}>
                 <MotionCard
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                  sx={{ borderRadius: 3, height: "100%" }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  sx={{
+                    borderRadius: 3,
+                    background: "white",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+                    border: "1px solid #e8e6e1",
+                    height: "100%",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
                 >
-                  <CardContent sx={{ p: 4 }}>
-                    <Typography variant="h5" fontWeight={800} mb={1}>
-                      Create Game Room
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" mb={3}>
-                      Host a private match with custom rules
-                    </Typography>
-
-                    <Grid container spacing={3}>
-                      <Grid item xs={12}>
-                        <TextField
-                          select
-                          fullWidth
-                          label="Max Players"
-                          value={maxPlayers}
-                          onChange={(e) =>
-                            setMaxPlayers(Number(e.target.value))
-                          }
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <People />
-                              </InputAdornment>
-                            ),
-                          }}
-                        >
-                          {[2, 3, 4, 5, 6, 7, 8].map((n) => (
-                            <MenuItem key={n} value={n}>
-                              {n} Players
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="Rounds"
-                          value={numRounds}
-                          onChange={(e) => setNumRounds(Number(e.target.value))}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Settings />
-                              </InputAdornment>
-                            ),
-                          }}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12}>
-                        <Button
-                          fullWidth
-                          size="large"
-                          variant="contained"
-                          startIcon={<AddCircle />}
-                          onClick={create}
-                          sx={{ py: 1.8, fontWeight: 700 }}
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 4,
+                      background: "linear-gradient(90deg, #27ae60, #2ecc71)",
+                    }}
+                  />
+                  <CardContent sx={{ p: 3, pt: 4 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        mb: 3,
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          bgcolor: "rgba(39, 174, 96, 0.1)",
+                          color: "#27ae60",
+                          width: 48,
+                          height: 48,
+                        }}
+                      >
+                        <AddCircle />
+                      </Avatar>
+                      <Box>
+                        <Typography
+                          variant="h5"
+                          sx={{ color: "#333", fontWeight: 700 }}
                         >
                           Create Room
-                        </Button>
-                      </Grid>
-                    </Grid>
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "#888", mt: 0.5 }}
+                        >
+                          Start a new drawing session
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Stack spacing={3}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Max Players"
+                        value={maxPlayers}
+                        onChange={(e) => setMaxPlayers(Number(e.target.value))}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            bgcolor: "#fafafa",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#27ae60",
+                            },
+                          },
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <People sx={{ color: "#27ae60" }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                      >
+                        {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <MenuItem key={n} value={n}>
+                            {n} Players
+                          </MenuItem>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Rounds"
+                        value={numRounds}
+                        onChange={(e) => setNumRounds(Number(e.target.value))}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Settings sx={{ color: "#27ae60" }} />
+                            </InputAdornment>
+                          ),
+                          inputProps: { min: 1, max: 10 },
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            bgcolor: "#fafafa",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#27ae60",
+                            },
+                          },
+                        }}
+                      />
+
+                      <Button
+                        fullWidth
+                        size="large"
+                        variant="contained"
+                        startIcon={<AddCircle />}
+                        onClick={create}
+                        sx={{
+                          py: 1.8,
+                          fontWeight: 700,
+                          backgroundColor: "#27ae60",
+                          "&:hover": {
+                            backgroundColor: "#219653",
+                            transform: "translateY(-2px)",
+                            boxShadow: "0 6px 20px rgba(39, 174, 96, 0.3)",
+                          },
+                          transition: "all 0.3s ease",
+                        }}
+                      >
+                        Create Game Room
+                      </Button>
+                    </Stack>
                   </CardContent>
                 </MotionCard>
               </Grid>
@@ -270,29 +462,83 @@ export default function Lobby({
               {/* Join Game */}
               <Grid item xs={12} md={6}>
                 <MotionCard
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                  sx={{ borderRadius: 3, height: "100%" }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  sx={{
+                    borderRadius: 3,
+                    background: "white",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+                    border: "1px solid #e8e6e1",
+                    height: "100%",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
                 >
-                  <CardContent sx={{ p: 4 }}>
-                    <Typography variant="h5" fontWeight={800} mb={1}>
-                      Join Game
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" mb={3}>
-                      Enter a room code to jump in
-                    </Typography>
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 4,
+                      background: "linear-gradient(90deg, #e67e22, #f39c12)",
+                    }}
+                  />
+                  <CardContent sx={{ p: 3, pt: 4 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        mb: 3,
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          bgcolor: "rgba(230, 126, 34, 0.1)",
+                          color: "#e67e22",
+                          width: 48,
+                          height: 48,
+                        }}
+                      >
+                        <VpnKey />
+                      </Avatar>
+                      <Box>
+                        <Typography
+                          variant="h5"
+                          sx={{ color: "#333", fontWeight: 700 }}
+                        >
+                          Join Game
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "#888", mt: 0.5 }}
+                        >
+                          Enter a room code to play
+                        </Typography>
+                      </Box>
+                    </Box>
 
                     <Stack spacing={3}>
                       <TextField
                         fullWidth
                         label="Room Code"
                         value={room}
-                        onChange={(e) => setRoom(e.target.value)}
+                        onChange={(e) => setRoom(e.target.value.toUpperCase())}
+                        placeholder="Enter 6-digit code"
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            bgcolor: "#fafafa",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#e67e22",
+                            },
+                          },
+                        }}
                         InputProps={{
                           startAdornment: (
                             <InputAdornment position="start">
-                              <VpnKey />
+                              <VpnKey sx={{ color: "#e67e22" }} />
                             </InputAdornment>
                           ),
                         }}
@@ -305,11 +551,73 @@ export default function Lobby({
                         endIcon={<ArrowForward />}
                         disabled={!room.trim()}
                         onClick={join}
-                        sx={{ py: 1.8, fontWeight: 700 }}
+                        sx={{
+                          py: 1.8,
+                          fontWeight: 700,
+                          backgroundColor: "#e67e22",
+                          "&:hover:not(:disabled)": {
+                            backgroundColor: "#d35400",
+                            transform: "translateY(-2px)",
+                            boxShadow: "0 6px 20px rgba(230, 126, 34, 0.3)",
+                          },
+                          "&:disabled": {
+                            opacity: 0.6,
+                          },
+                          transition: "all 0.3s ease",
+                        }}
                       >
-                        Join
+                        Join Room
                       </Button>
                     </Stack>
+                  </CardContent>
+                </MotionCard>
+              </Grid>
+
+              {/* Bottom Info Card */}
+              <Grid item xs={12}>
+                <MotionCard
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  sx={{
+                    borderRadius: 3,
+                    background: "white",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+                    border: "1px solid #e8e6e1",
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        mb: 2,
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          bgcolor: "rgba(211, 84, 0, 0.1)",
+                          color: "#d35400",
+                        }}
+                      >
+                        <Brush />
+                      </Avatar>
+                      <Typography
+                        variant="h6"
+                        sx={{ color: "#333", fontWeight: 600 }}
+                      >
+                        About Sketch Quest
+                      </Typography>
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "#666", lineHeight: 1.6 }}
+                    >
+                      A fun, social drawing game where players take turns
+                      drawing prompts while others guess in real-time. Perfect
+                      for game nights with friends or making new connections!
+                    </Typography>
                   </CardContent>
                 </MotionCard>
               </Grid>
@@ -318,10 +626,26 @@ export default function Lobby({
         </Grid>
 
         {/* Footer */}
-        <Box mt={6} textAlign="center" sx={{ opacity: 0.7 }}>
-          <Typography variant="caption">
-            © Sketch Quest <br /> The owner of this site is not responsible for
-            any user generated content (drawings, messages, usernames)
+        <Box
+          sx={{
+            mt: 8,
+            pt: 4,
+            borderTop: "1px solid #e8e6e1",
+            textAlign: "center",
+          }}
+        >
+          <Typography
+            variant="body2"
+            sx={{
+              color: "#888",
+              maxWidth: 600,
+              mx: "auto",
+              lineHeight: 1.6,
+            }}
+          >
+            © {new Date().getFullYear()} Sketch Quest
+            <br />
+            All user-generated content reflects individual creativity
           </Typography>
         </Box>
       </Container>
