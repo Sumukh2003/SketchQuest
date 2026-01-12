@@ -6,13 +6,19 @@ import {
   Chip,
   Paper,
   Stack,
-  TextField,
   Typography,
+  Slider,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
-import BrushIcon from "@mui/icons-material/Brush";
-import UndoIcon from "@mui/icons-material/Undo";
-import ClearIcon from "@mui/icons-material/Clear";
-import EraserIcon from "@mui/icons-material/AutoFixNormal";
+import {
+  Brush as BrushIcon,
+  Undo as UndoIcon,
+  ClearAll as ClearIcon,
+  AutoFixNormal as EraserIcon,
+  Palette,
+} from "@mui/icons-material";
+
 type Props = { room: string; isDrawer: boolean };
 
 type Stroke = {
@@ -27,12 +33,13 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 
   const [drawing, setDrawing] = useState(false);
-  const [color, setColor] = useState("#000000");
+  const [color, setColor] = useState("#d35400");
   const [size, setSize] = useState(3);
   const [eraser, setEraser] = useState(false);
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const currentStroke = useRef<Stroke | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current!;
     canvas.width = 800;
@@ -43,16 +50,13 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
     ctx.lineJoin = "round";
     ctxRef.current = ctx;
 
-    // define handler
     const handleDrawing = (stroke: Stroke) => {
       drawStroke(ctx, stroke);
       setStrokes((prev) => [...prev, stroke]);
     };
 
-    // attach listener
     socket.on("drawing_data", handleDrawing);
 
-    // cleanup function
     return () => {
       socket.off("drawing_data", handleDrawing);
     };
@@ -106,9 +110,9 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
 
   const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
     if (stroke.eraser) {
-      ctx.globalCompositeOperation = "destination-out"; // this actually erases
+      ctx.globalCompositeOperation = "destination-out";
     } else {
-      ctx.globalCompositeOperation = "source-over"; // normal drawing
+      ctx.globalCompositeOperation = "source-over";
       ctx.strokeStyle = stroke.color;
     }
 
@@ -148,150 +152,219 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
     strokesToDraw.forEach((s) => drawStroke(ctx, s));
   };
 
+  // Compact color palette
+  const themeColors = [
+    "#d35400", // Primary orange
+    "#27ae60", // Green
+    "#e67e22", // Orange
+    "#e74c3c", // Red
+    "#2c3e50", // Dark
+    "#000000", // Black
+    "#ffffff", // White
+  ];
+
   return (
-    <Box sx={{ p: 2, maxWidth: 1200, margin: "0 auto" }}>
-      {/* Toolbar Section */}
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "transparent",
+      }}
+    >
+      {/* Compact Toolbar - Fixed to top of canvas */}
       <Paper
-        elevation={2}
         sx={{
-          p: 2,
-          mb: 2,
-          borderRadius: 2,
-          backgroundColor: "#f8f9fa",
+          p: 1.5,
+          borderRadius: "8px 8px 0 0",
+          background: "white",
+          border: "1px solid #e8e6e1",
+          borderBottom: "1px solid #ccc",
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          minHeight: "auto",
         }}
       >
-        <Stack
-          direction="row"
-          spacing={2}
-          alignItems="center"
-          flexWrap="wrap"
-          rowGap={1}
-        >
-          {/* Color Picker */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Color:
-            </Typography>
-            <Box
+        {/* Color Picker - Compact */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Palette fontSize="small" sx={{ color: "#888" }} />
+          <Stack direction="row" spacing={0.5}>
+            {themeColors.map((col) => (
+              <Tooltip key={col} title={col === "#ffffff" ? "White" : col}>
+                <Box
+                  onClick={() => setColor(col)}
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    bgcolor: col,
+                    cursor: "pointer",
+                    border: `2px solid ${
+                      color === col ? "#d35400" : "transparent"
+                    }`,
+                    boxShadow:
+                      col === "#ffffff" ? "inset 0 0 0 1px #ddd" : "none",
+                    "&:hover": {
+                      transform: "scale(1.1)",
+                    },
+                    transition: "transform 0.2s ease",
+                  }}
+                />
+              </Tooltip>
+            ))}
+          </Stack>
+        </Box>
+
+        {/* Brush Size - Compact */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 1 }}>
+          <Box
+            sx={{
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              bgcolor: eraser ? "#999" : color,
+              border: `1px solid ${eraser ? "#ccc" : color}`,
+            }}
+          />
+          <Slider
+            value={size}
+            onChange={(e, newValue) => setSize(newValue as number)}
+            min={1}
+            max={30}
+            sx={{
+              width: 80,
+              color: eraser ? "#999" : color,
+              "& .MuiSlider-thumb": {
+                width: 16,
+                height: 16,
+                bgcolor: eraser ? "#999" : color,
+              },
+            }}
+          />
+          <Chip
+            label={`${size}`}
+            size="small"
+            sx={{
+              bgcolor: "rgba(211, 84, 0, 0.1)",
+              color: "#d35400",
+              fontWeight: 600,
+              minWidth: 30,
+              height: 24,
+            }}
+          />
+        </Box>
+
+        {/* Tools - Compact */}
+        <Stack direction="row" spacing={0.5} sx={{ ml: "auto" }}>
+          <Tooltip title={eraser ? "Brush" : "Eraser"}>
+            <IconButton
+              onClick={() => setEraser(!eraser)}
+              size="small"
               sx={{
-                position: "relative",
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                overflow: "hidden",
-                border: "2px solid #dee2e6",
-                cursor: "pointer",
+                bgcolor: eraser
+                  ? "rgba(231, 76, 60, 0.1)"
+                  : "rgba(39, 174, 96, 0.1)",
+                color: eraser ? "#e74c3c" : "#27ae60",
+                width: 36,
+                height: 36,
+                borderRadius: 1,
               }}
             >
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                style={{
-                  position: "absolute",
-                  width: "100%",
-                  height: "100%",
-                  border: "none",
-                  cursor: "pointer",
-                  opacity: 0,
-                }}
-              />
-              <Box
-                sx={{
-                  width: "100%",
-                  height: "100%",
-                  backgroundColor: color,
-                }}
-              />
-            </Box>
-          </Box>
+              {eraser ? (
+                <EraserIcon fontSize="small" />
+              ) : (
+                <BrushIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
 
-          {/* Brush Size */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Size:
-            </Typography>
-            <TextField
-              type="number"
+          <Tooltip title="Undo">
+            <IconButton
+              onClick={undo}
+              disabled={strokes.length === 0}
               size="small"
-              value={size}
-              onChange={(e) => setSize(Number(e.target.value))}
-              inputProps={{ min: 1, max: 50 }}
               sx={{
-                width: 80,
-                "& .MuiInputBase-root": {
-                  backgroundColor: "white",
-                  borderRadius: 1,
+                bgcolor: "rgba(230, 126, 34, 0.1)",
+                color: "#e67e22",
+                width: 36,
+                height: 36,
+                borderRadius: 1,
+                "&:disabled": {
+                  bgcolor: "rgba(0, 0, 0, 0.05)",
+                  color: "#999",
                 },
               }}
-            />
-          </Box>
+            >
+              <UndoIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
 
-          {/* Tools */}
-          <Box sx={{ display: "flex", gap: 1, ml: 1 }}>
-            <Button
-              variant={eraser ? "contained" : "outlined"}
-              onClick={() => setEraser(!eraser)}
-              startIcon={eraser ? <EraserIcon /> : <BrushIcon />}
-              color={eraser ? "error" : "primary"}
+          <Tooltip title="Clear">
+            <IconButton
+              onClick={clearCanvas}
+              size="small"
               sx={{
-                borderRadius: 2,
-                minWidth: 120,
+                bgcolor: "rgba(231, 76, 60, 0.1)",
+                color: "#e74c3c",
+                width: 36,
+                height: 36,
+                borderRadius: 1,
               }}
             >
-              {eraser ? "Eraser" : "Brush"}
-            </Button>
-
-            <Button
-              variant="outlined"
-              onClick={undo}
-              startIcon={<UndoIcon />}
-              sx={{ borderRadius: 2 }}
-            >
-              Undo
-            </Button>
-
-            <Button
-              variant="contained"
-              color="error"
-              onClick={clearCanvas}
-              startIcon={<ClearIcon />}
-              sx={{ borderRadius: 2 }}
-            >
-              Clear
-            </Button>
-          </Box>
-
-          {/* Status Indicator */}
-          <Chip
-            label={isDrawer ? "Ready to draw" : "Drawing disabled"}
-            color={isDrawer ? "success" : "default"}
-            size="small"
-            sx={{ ml: "auto" }}
-          />
+              <ClearIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Stack>
+
+        {/* Status - Compact */}
+        <Chip
+          label={isDrawer ? "Draw" : "View"}
+          size="small"
+          sx={{
+            bgcolor: isDrawer
+              ? "rgba(39, 174, 96, 0.1)"
+              : "rgba(153, 153, 153, 0.1)",
+            color: isDrawer ? "#27ae60" : "#999",
+            fontWeight: 600,
+            height: 28,
+            border: `1px solid ${
+              isDrawer ? "rgba(39, 174, 96, 0.3)" : "rgba(153, 153, 153, 0.3)"
+            }`,
+          }}
+        />
       </Paper>
 
-      {/* Canvas Section */}
-      <Paper
-        elevation={1}
+      {/* Canvas Area - Takes most space */}
+      <Box
         sx={{
-          p: 1,
-          borderRadius: 2,
-          backgroundColor: "white",
+          flexGrow: 1,
+          position: "relative",
+          borderRadius: "0 0 8px 8px",
+          overflow: "hidden",
+          bgcolor: "white",
+          border: "1px solid #e8e6e1",
+          borderTop: "none",
         }}
       >
         <canvas
           ref={canvasRef}
           style={{
             display: "block",
-            border: "1px solid #e0e0e0",
-            borderRadius: 8,
             width: "100%",
-            height: "500px",
+            height: "100%",
             backgroundColor: "white",
-            cursor: isDrawer ? "crosshair" : "not-allowed",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+            cursor: isDrawer
+              ? eraser
+                ? `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="%23e74c3c" stroke-width="2"/></svg>') 12 12, auto`
+                : `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="${Math.min(
+                    size / 2,
+                    10
+                  )}" fill="${color.replace(
+                    "#",
+                    "%23"
+                  )}" stroke="%23fff" stroke-width="1"/></svg>') 12 12, crosshair`
+              : "not-allowed",
           }}
           onMouseDown={startStroke}
           onMouseUp={endStroke}
@@ -301,14 +374,45 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
           onTouchMove={moveStroke}
           onTouchEnd={endStroke}
         />
-      </Paper>
 
-      {/* Instructions */}
-      <Box sx={{ mt: 2, textAlign: "center" }}>
-        <Typography variant="caption" color="text.secondary">
-          Click and drag to draw •{" "}
-          {eraser ? "Eraser mode active" : "Brush mode active"}
-        </Typography>
+        {/* Mode Indicator - Minimal */}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            bgcolor: "rgba(255, 255, 255, 0.9)",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <Box
+            sx={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              bgcolor: eraser ? "#e74c3c" : color,
+            }}
+          />
+          <Typography
+            variant="caption"
+            sx={{
+              color: eraser ? "#e74c3c" : "#666",
+              fontWeight: 600,
+              fontSize: "0.7rem",
+            }}
+          >
+            {eraser ? "Eraser" : "Brush"}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#999", ml: 1 }}>
+            Strokes: {strokes.length}
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
