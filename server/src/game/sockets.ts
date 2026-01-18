@@ -157,7 +157,9 @@ export function registerSocketHandlers(io: Server) {
       io.to(drawer.id).emit("choose_word", { options: wordOptions });
       io.to(room).emit("players", gm.getGame(room)?.players || []);
 
-      cb({ ok: true });
+      if (typeof cb === "function") {
+        cb({ ok: true });
+      }
     });
 
     // Drawer picks a word -> this actually starts the round (increments round)
