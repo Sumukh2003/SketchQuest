@@ -5,29 +5,45 @@ import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
 import { registerSocketHandlers } from "./game/sockets";
+import { ClientToServerEvents, ServerToClientEvents } from "./types";
+
+const DEFAULT_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://sketchquest.vercel.app",
+];
+
+const allowedOrigins = process.env.CLIENT_URL
+  ? [...DEFAULT_ORIGINS, ...process.env.CLIENT_URL.split(",").map((s) => s.trim())]
+  : DEFAULT_ORIGINS;
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = new Server(server, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://sketchquest.vercel.app",
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
 });
 
 registerSocketHandlers(io);
 
-// health
-app.get("/", (req, res) => res.send("skribbl-server OK"));
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "sketchquest-server" });
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
 
 const port = Number(process.env.PORT || 4000);
 server.listen(port, () => {
-  console.log("Server listening on", port);
+  console.log(`Server listening on ${port}`);
 });
