@@ -9,43 +9,75 @@ import {
   Box,
 } from "@mui/material";
 import { Send } from "@mui/icons-material";
+import { sounds } from "../sounds";
+
+const MESSAGE_MAX_LEN = 200;
 
 type Message = {
   name?: string;
   text: string;
   system?: boolean;
+  correct?: boolean;
+  close?: boolean;
+  kind?: "join" | "leave";
 };
 
-export default function Chat({ room }: { room: string }) {
+export default function Chat({
+  room,
+  isDrawer,
+}: {
+  room: string;
+  isDrawer: boolean;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    socket.on("chat_message", (msg: { name: string; text: string }) => {
-      setMessages((prev) => [...prev, { name: msg.name, text: msg.text }]);
-    });
+    const onChatMessage = (msg: Message) => {
+      setMessages((prev) => [...prev, msg]);
+      if (msg.kind === "join") sounds.join();
+      if (msg.kind === "leave") sounds.leave();
+    };
 
-    socket.on("correct_guess", (msg: { name: string }) => {
+    const onCorrectGuess = (msg: { name?: string }) => {
       setMessages((prev) => [
         ...prev,
-        { system: true, text: `${msg.name} guessed the word!` },
+        { system: true, correct: true, text: `${msg.name} guessed the word!` },
       ]);
-    });
+      sounds.correctGuess();
+    };
+
+    socket.on("chat_message", onChatMessage);
+    socket.on("correct_guess", onCorrectGuess);
 
     return () => {
-      socket.off("chat_message");
-      socket.off("correct_guess");
+      socket.off("chat_message", onChatMessage);
+      socket.off("correct_guess", onCorrectGuess);
     };
   }, []);
+
+  useEffect(() => {
+    setMessages([]);
+  }, [room]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const send = () => {
-    if (!input.trim()) return;
-    socket.emit("guess", { room, text: input });
+    const text = input.trim().slice(0, MESSAGE_MAX_LEN);
+    if (!text) return;
+    socket.emit("guess", { room, text }, (res) => {
+      if (res.correct) return; // correct_guess event already handles feedback
+      sounds.wrongGuess();
+      if (res.close) {
+        setMessages((prev) => [
+          ...prev,
+          { system: true, close: true, text: "🔥 So close! Try again" },
+        ]);
+      }
+    });
     setInput("");
   };
 
@@ -69,16 +101,10 @@ export default function Chat({ room }: { room: string }) {
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          p: 2,
-          borderBottom: "1px solid #e8e6e1",
-          bgcolor: "#fafafa",
-        }}
-      >
+      <Box sx={{ p: 2, borderBottom: "1px solid #e8e6e1", bgcolor: "#fafafa" }}>
         <Typography sx={{ fontWeight: 700, color: "#333" }}>Chat</Typography>
         <Typography variant="caption" sx={{ color: "#888" }}>
-          Guess the word in real-time
+          {isDrawer ? "You can't guess while drawing" : "Guess the word in real-time"}
         </Typography>
       </Box>
 
@@ -93,17 +119,23 @@ export default function Chat({ room }: { room: string }) {
           gap: 1,
         }}
       >
+        {messages.length === 0 && (
+          <Typography variant="caption" sx={{ color: "#aaa", textAlign: "center", mt: 2 }}>
+            No messages yet
+          </Typography>
+        )}
         {messages.map((m, i) => (
           <Box key={i}>
             {m.system ? (
               <Typography
                 variant="caption"
                 sx={{
-                  color: "#27ae60",
+                  color: m.correct ? "#27ae60" : m.close ? "#e67e22" : "#999",
                   fontWeight: 600,
                   display: "block",
                   textAlign: "center",
                   my: 1,
+                  fontStyle: m.correct || m.close ? "normal" : "italic",
                 }}
               >
                 {m.text}
@@ -116,7 +148,7 @@ export default function Chat({ room }: { room: string }) {
                 >
                   {m.name}:
                 </Typography>
-                <Typography variant="body2" sx={{ color: "#333" }}>
+                <Typography variant="body2" sx={{ color: "#333", wordBreak: "break-word" }}>
                   {m.text}
                 </Typography>
               </Box>
@@ -132,10 +164,12 @@ export default function Chat({ room }: { room: string }) {
           <TextField
             size="small"
             fullWidth
-            placeholder="Type your guess..."
+            placeholder={isDrawer ? "Drawing… chat is disabled" : "Type your guess..."}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value.slice(0, MESSAGE_MAX_LEN))}
             onKeyPress={handleKeyPress}
+            disabled={isDrawer}
+            inputProps={{ maxLength: MESSAGE_MAX_LEN }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 bgcolor: "#fafafa",
@@ -148,7 +182,7 @@ export default function Chat({ room }: { room: string }) {
           <Button
             variant="contained"
             onClick={send}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isDrawer}
             sx={{
               bgcolor: "#d35400",
               fontWeight: 600,

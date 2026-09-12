@@ -22,6 +22,7 @@ import {
 type Props = { room: string; isDrawer: boolean };
 
 type Stroke = {
+  id: number;
   color: string;
   size: number;
   eraser?: boolean;
@@ -39,6 +40,7 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const currentStroke = useRef<Stroke | null>(null);
+  const strokeIdRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -55,10 +57,32 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
       setStrokes((prev) => [...prev, stroke]);
     };
 
+    const handleClear = () => {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      setStrokes([]);
+    };
+
+    const handleUndo = () => {
+      setStrokes((prev) => {
+        if (prev.length === 0) return prev;
+        const lastId = prev[prev.length - 1].id;
+        const filtered = prev.filter((s) => s.id !== lastId);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        filtered.forEach((s) => drawStroke(ctx, s));
+        return filtered;
+      });
+    };
+
     socket.on("drawing_data", handleDrawing);
+    socket.on("clear_canvas", handleClear);
+    socket.on("round_started", handleClear);
+    socket.on("undo_stroke", handleUndo);
 
     return () => {
       socket.off("drawing_data", handleDrawing);
+      socket.off("clear_canvas", handleClear);
+      socket.off("round_started", handleClear);
+      socket.off("undo_stroke", handleUndo);
     };
   }, []);
 
@@ -77,7 +101,9 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
     if (!isDrawer) return;
     setDrawing(true);
     const pos = getPos(e);
+    strokeIdRef.current += 1;
     currentStroke.current = {
+      id: strokeIdRef.current,
       color,
       size,
       eraser,
@@ -96,8 +122,11 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
     });
 
     socket.emit("drawing_data", {
-      ...currentStroke.current,
-      points: [currentStroke.current.points.slice(-2)[0], pos],
+      room,
+      data: {
+        ...currentStroke.current,
+        points: [currentStroke.current.points.slice(-2)[0], pos],
+      },
     });
   };
 
@@ -128,22 +157,19 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
   };
 
   const undo = () => {
-    if (strokes.length === 0) return;
+    if (!isDrawer || strokes.length === 0) return;
     const newStrokes = strokes.slice(0, -1);
     setStrokes(newStrokes);
     redrawAll(newStrokes);
+    socket.emit("undo_stroke", { room });
   };
 
   const clearCanvas = () => {
+    if (!isDrawer) return;
     const ctx = ctxRef.current!;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     setStrokes([]);
-    socket.emit("drawing_data", {
-      color: "#fff",
-      size: ctx.lineWidth,
-      points: [{ x: 0, y: 0 }],
-      eraser: true,
-    });
+    socket.emit("clear_canvas", { room });
   };
 
   const redrawAll = (strokesToDraw: Stroke[]) => {
@@ -182,8 +208,12 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
           borderBottom: "1px solid #ccc",
           display: "flex",
           alignItems: "center",
-          gap: 1.5,
+          flexWrap: "wrap",
+          rowGap: 1,
+          gap: { xs: 1, sm: 1.5 },
           minHeight: "auto",
+          opacity: isDrawer ? 1 : 0.5,
+          pointerEvents: isDrawer ? "auto" : "none",
         }}
       >
         {/* Color Picker - Compact */}
@@ -354,6 +384,7 @@ export default function CanvasBoard({ room, isDrawer }: Props) {
             width: "100%",
             height: "100%",
             backgroundColor: "white",
+            touchAction: "none",
             cursor: isDrawer
               ? eraser
                 ? `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="%23e74c3c" stroke-width="2"/></svg>') 12 12, auto`

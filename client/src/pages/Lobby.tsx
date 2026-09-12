@@ -14,6 +14,8 @@ import {
   CardContent,
   Container,
   IconButton,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import {
   Person,
@@ -28,8 +30,10 @@ import {
 } from "@mui/icons-material";
 import { motion } from "framer-motion";
 import { socket } from "../socket";
+import { unlockAudio } from "../sounds";
 
 const MotionCard = motion(Card);
+const NAME_MAX_LEN = 20;
 
 export default function Lobby({
   onJoin,
@@ -42,28 +46,45 @@ export default function Lobby({
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [numRounds, setNumRounds] = useState(3);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"create" | "join" | null>(null);
 
   const avatars = ["🎨", "✏️", "🖌️", "🎯", "🌟", "✨", "🔥", "💎"];
 
+  const cleanName = () => name.trim().slice(0, NAME_MAX_LEN) || "Player";
+
   const create = () => {
+    unlockAudio();
+    setBusy("create");
     socket.emit(
       "create_game",
-      { name, maxPlayers, numRounds, avatar },
-      (res: { room: string }) => {
-        onJoin(res.room, name, avatar);
+      { name: cleanName(), maxPlayers, numRounds, avatar },
+      (res: any) => {
+        setBusy(null);
+        if (res?.error) return setError(res.error);
+        onJoin(res.room, cleanName(), avatar);
       }
     );
   };
 
   const join = () => {
-    if (!room) return;
-    socket.emit("join_game", { room, name, avatar }, (res: { ok: any }) => {
-      if (res?.ok) onJoin(room, name, avatar);
-    });
+    if (!room.trim()) return;
+    unlockAudio();
+    setBusy("join");
+    socket.emit(
+      "join_game",
+      { room: room.trim().toUpperCase(), name: cleanName(), avatar },
+      (res: any) => {
+        setBusy(null);
+        if (res?.error) return setError(res.error);
+        onJoin(res.room, cleanName(), avatar);
+      }
+    );
   };
 
   const handleNameSubmit = () => {
     if (name.trim()) {
+      setName(cleanName());
       setIsEditingName(false);
     }
   };
@@ -232,10 +253,14 @@ export default function Lobby({
                     <TextField
                       fullWidth
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) =>
+                        setName(e.target.value.slice(0, NAME_MAX_LEN))
+                      }
                       onKeyPress={(e) =>
                         e.key === "Enter" && handleNameSubmit()
                       }
+                      inputProps={{ maxLength: NAME_MAX_LEN }}
+                      helperText={`${name.length}/${NAME_MAX_LEN}`}
                       autoFocus
                       sx={{
                         "& .MuiOutlinedInput-root": {
@@ -440,6 +465,7 @@ export default function Lobby({
                         variant="contained"
                         startIcon={<AddCircle />}
                         onClick={create}
+                        disabled={busy !== null}
                         sx={{
                           py: 1.8,
                           fontWeight: 700,
@@ -452,7 +478,7 @@ export default function Lobby({
                           transition: "all 0.3s ease",
                         }}
                       >
-                        Create Game Room
+                        {busy === "create" ? "Creating…" : "Create Game Room"}
                       </Button>
                     </Stack>
                   </CardContent>
@@ -526,7 +552,9 @@ export default function Lobby({
                         label="Room Code"
                         value={room}
                         onChange={(e) => setRoom(e.target.value.toUpperCase())}
-                        placeholder="Enter 6-digit code"
+                        onKeyPress={(e) => e.key === "Enter" && join()}
+                        placeholder="Enter room code"
+                        inputProps={{ maxLength: 10 }}
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             bgcolor: "#fafafa",
@@ -549,7 +577,7 @@ export default function Lobby({
                         size="large"
                         variant="contained"
                         endIcon={<ArrowForward />}
-                        disabled={!room.trim()}
+                        disabled={!room.trim() || busy !== null}
                         onClick={join}
                         sx={{
                           py: 1.8,
@@ -566,7 +594,7 @@ export default function Lobby({
                           transition: "all 0.3s ease",
                         }}
                       >
-                        Join Room
+                        {busy === "join" ? "Joining…" : "Join Room"}
                       </Button>
                     </Stack>
                   </CardContent>
@@ -649,6 +677,17 @@ export default function Lobby({
           </Typography>
         </Box>
       </Container>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity="error" onClose={() => setError(null)} variant="filled">
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
